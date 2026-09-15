@@ -1,0 +1,140 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Chain {
+  id                Int       @id @default(autoincrement())
+  name              String    @unique
+  chainId           Int       @unique
+  symbol            String?
+  nativeToken       String?
+  rpcUrl            String
+  blockExplorer     String?
+  tvlUsd            Decimal?  @db.Decimal(18, 2)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  products          Product[]
+  @@map("chains")
+}
+
+model Protocol {
+  id                Int       @id @default(autoincrement())
+  name              String    @unique
+  description       String?
+  logoUrl           String?
+  website           String?
+  github            String?
+  auditStatus       String?
+  auditBy           String[]  @default([])
+  tvlUsd            Decimal?  @db.Decimal(18, 2)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  products          Product[]
+  @@map("protocols")
+}
+
+model Product {
+  id                    String    @id @default(uuid())
+  name                  String
+  description           String?
+  chainId               Int
+  protocolId            Int
+  type                  String    // "lending", "yield_farm", "liquidity_pool", "staking"
+  subtype               String?
+  apy                   Decimal?  @db.Decimal(10, 4)
+  apr                   Decimal?  @db.Decimal(10, 4)
+  tvlUsd                Decimal?  @db.Decimal(18, 2)
+  liquidityUsd          Decimal?  @db.Decimal(18, 2)
+  baseToken             String?
+  baseTokenAddress      String?
+  rewardTokens          String[]  @default([])
+  riskScore             Decimal?  @db.Decimal(5, 2)
+  impermanentLossRisk   Decimal?  @db.Decimal(5, 2)
+  smartContractRisk     String?
+  minDeposit            Decimal?  @db.Decimal(18, 2)
+  maxDeposit            Decimal?  @db.Decimal(18, 2)
+  lockPeriod            Int?
+  contractAddress       String?
+  isActive              Boolean   @default(true)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  
+  chain                 Chain     @relation(fields: [chainId], references: [id])
+  protocol              Protocol  @relation(fields: [protocolId], references: [id])
+  apyHistory            ApyHistory[]
+  portfolios            Portfolio[]
+  
+  @@index([chainId])
+  @@index([protocolId])
+  @@index([type])
+  @@index([apy])
+  @@map("products")
+}
+
+model ApyHistory {
+  id                Int       @id @default(autoincrement())
+  productId         String
+  apy               Decimal?  @db.Decimal(10, 4)
+  apr               Decimal?  @db.Decimal(10, 4)
+  tvlUsd            Decimal?  @db.Decimal(18, 2)
+  recordedAt        DateTime  @default(now())
+  
+  product           Product   @relation(fields: [productId], references: [id])
+  @@index([productId, recordedAt(sort: Desc)])
+  @@map("apy_history")
+}
+
+model User {
+  id                String    @id @default(uuid())
+  walletAddress     String    @unique
+  username          String?
+  email             String?   @unique
+  riskTolerance     String?   // "conservative", "moderate", "aggressive"
+  preferredChains   String[]  @default([])
+  kycStatus         String?
+  kycVerifiedAt     DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  portfolios        Portfolio[]
+  @@map("users")
+}
+
+model Portfolio {
+  id                String    @id @default(uuid())
+  userId            String
+  productId         String
+  amountInvested    Decimal   @db.Decimal(18, 8)
+  investedAt        DateTime  @default(now())
+  totalYieldUsd     Decimal?  @db.Decimal(18, 2)
+  totalYieldPercent Decimal?  @db.Decimal(10, 4)
+  status            String    // "active", "withdrawn", "liquidated"
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  user              User      @relation(fields: [userId], references: [id])
+  product           Product   @relation(fields: [productId], references: [id])
+  @@index([userId])
+  @@map("portfolios")
+}
+
+model ExchangeProduct {
+  id                String    @id @default(uuid())
+  exchangeName      String    // "Binance", "OKX", "Kraken"
+  productName       String
+  asset             String    // "BTC", "USDT"
+  apy               Decimal?  @db.Decimal(10, 4)
+  lockPeriod        Int?
+  status            String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  @@map("exchange_products")
+}
